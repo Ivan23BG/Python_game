@@ -4,7 +4,7 @@ import random
 from settings import *
 from player import Player
 from enemy import Enemy
-from xp_orb import XpOrb
+from xp_orbs import XpOrbs
 
 # Initialize Pygame
 pygame.init()
@@ -14,7 +14,7 @@ clock = pygame.time.Clock()
 
 # Initialize game objects
 player = Player()
-xp_orbs = []
+xp_orbs = XpOrbs()
 enemies = []
 
 # Game loop variables
@@ -50,16 +50,10 @@ while running:
         screen.fill("black")
 
         # Spawn XP orbs
-        if len(xp_orbs) < XP_ORB_SPAWN_MIN or (len(xp_orbs) < XP_ORB_SPAWN_MAX and random.random() < XP_ORB_SPAWN_RATE):
-            xp_orbs.append(XpOrb(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT), XP_ORB_RADIUS))
-
+        xp_orbs.spawn()
+        
         # Update XP orbs
-        for orb in xp_orbs:
-            if pygame.Vector2(player.pos - orb.pos).length() < player.radius + orb.radius:
-                xp_orbs.remove(orb)
-                player.xp += 1
-                if player.xp >= player.xp_to_next_level:
-                    player.level_up()
+        xp_orbs.update(player)
 
         # Spawn enemies
         if len(enemies) < ENEMY_SPAWN_MIN or (len(enemies) < ENEMY_SPAWN_MAX and random.random() < ENEMY_SPAWN_RATE):
@@ -75,8 +69,10 @@ while running:
         # Display all with offset to player coordinates
         offset_x = player.pos.x - SCREEN_WIDTH / 2
         offset_y = player.pos.y - SCREEN_HEIGHT / 2
-        for orb in xp_orbs:
-            orb.draw_with_offset(screen, offset_x, offset_y)
+        offset = pygame.Vector2(offset_x, offset_y)
+        
+        xp_orbs.draw_with_offset(screen, offset)
+        
         for enemy in enemies:
             enemy.draw_with_offset(screen, offset_x, offset_y)
         player.draw_with_offset(screen, offset_x, offset_y)
