@@ -5,8 +5,8 @@ class Player:
     def __init__(self):
         self.pos = pygame.Vector2(1280/2, 720/2)
         self.radius = 40
-        self.speed = 500
-        self.max_hp = 100
+        self.speed = 300
+        self.max_hp = -1
         self.hp = self.max_hp
         self.xp = 0
         self.level = 1
@@ -15,7 +15,7 @@ class Player:
 
     def handle_xp(self, orb):
         self.xp += orb.xp
-        if self.xp >= self.xp_to_next_level:
+        while self.xp >= self.xp_to_next_level:
             self.level_up()
 
 
@@ -24,8 +24,8 @@ class Player:
 
 
     def handle_movement(self, keys, dt):
-        move_x, move_y = self.move(keys, dt)
-        self.pos += pygame.Vector2(move_x, move_y)
+        move = self.move(keys, dt)
+        self.pos += move
 
 
     def move(self, keys, dt):
@@ -38,7 +38,9 @@ class Player:
             move_x = -self.speed * dt
         if keys[pygame.K_d]:
             move_x = self.speed * dt
-        return move_x, move_y
+        move = pygame.Vector2(move_x, move_y)
+        return move
+
 
     def level_up(self):
         print("leveled up")
@@ -47,16 +49,20 @@ class Player:
         self.xp_to_next_level *= 1.5
         self.max_hp += 10
         self.hp = self.max_hp
-        
+
+
     def take_damage(self, dmg):
-        self.hp -= dmg
-        if self.hp <= 0:
+        if self.hp >0:
+            self.hp = max(self.hp - dmg, 0)
+        if self.hp == 0:
             print("Player died!")
             pygame.quit()
             sys.exit()
 
+
     def draw(self, screen):
         pygame.draw.circle(screen, "white", self.pos, self.radius)
+
 
     def draw_with_offset(self, screen, offset_x, offset_y):
         pygame.draw.circle(screen, "white", self.pos - pygame.Vector2(offset_x, offset_y), self.radius)
