@@ -3,8 +3,9 @@ import sys
 import random
 from settings import *
 from player import Player
-from enemy import Enemy
 from xp_orbs import XpOrbs
+from enemies import Enemies  # Enemies manager class
+from projectile import Projectile  # Projectile class
 
 # Initialize Pygame
 pygame.init()
@@ -15,80 +16,111 @@ clock = pygame.time.Clock()
 # Initialize game objects
 player = Player()
 xp_orbs = XpOrbs()
-enemies = []
+enemies = Enemies()  # Using the Enemies manager
+projectiles = []  # List to hold projectiles
 
-# Game loop variables
-offset_x = 0
-offset_y = 0
+# Game state variables
 running = True
+paused = False
 
 
-def handle_events():
+def handle_events() -> None:
+    """
+    Handles global game events such as quitting or pausing.
+    """
     global running, paused
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_p:
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                running = False
+            elif event.key == pygame.K_p:
                 paused = not paused
 
 
-def handle_input():
-    global running, keys
-    if keys[pygame.K_ESCAPE]:
-        running = False
+def update_projectiles(dt: float) -> None:
+    """
+    Updates all projectiles, checks for collisions, and removes those that collide or leave the screen.
+
+    Args:
+        dt (float): Delta time for frame-independent movement.
+    """
+    for projectile in projectiles[:]:
+        projectile.update(dt)
+        # Check for collisions with enemies
+        enemy_hit = projectile.check_collision(enemies.enemies)
+        if enemy_hit:
+            enemy_hit.take_damage(10)  # Example damage
+            projectiles.remove(projectile)
+        elif not (0 <= projectile.pos.x <= SCREEN_WIDTH and 0 <= projectile.pos.y <= SCREEN_HEIGHT):
+            projectiles.remove(projectile)  # Remove projectiles out of bounds
 
 
-paused = False
+def draw_with_offset(offset: pygame.Vector2) -> None:
+    """
+    Draws all game objects with a positional offset for a camera-like effect.
+
+    Args:
+        offset (pygame.Vector2): The positional offset.
+    """
+    xp_orbs.draw_with_offset(screen, offset)
+    enemies.draw_with_offset(screen, offset)
+    for projectile in projectiles:
+        projectile.draw_with_offset(screen, offset, "yellow")
+    player.draw_with_offset(screen, offset.x, offset.y)
+
+
+def pause_menu() -> None:
+    """
+    Displays the pause menu while the game is paused.
+    """
+    font = pygame.font.Font(None, 36)
+    text = font.render("Paused", True, "white")
+    text_rect = text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 200))
+    screen.blit(text, text_rect)
+    pygame.display.flip()
+
+
 # Main game loop
 while running:
     keys = pygame.key.get_pressed()
     handle_events()
-    handle_input()
-    while not paused:
-        dt = clock.tick(60) / 1000
-        screen.fill("black")
 
-        # Spawn XP orbs
-        xp_orbs.spawn()
-        
-        # Update XP orbs
-        xp_orbs.update(player)
+    if paused:
+        pause_menu()
+        continue
 
-        # Spawn enemies
-        if len(enemies) < ENEMY_SPAWN_MIN or (len(enemies) < ENEMY_SPAWN_MAX and random.random() < ENEMY_SPAWN_RATE):
-            enemies.append(Enemy(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT), ENEMY_RADIUS))
+    # Game updates
+    dt = clock.tick(60) / 1000
+    screen.fill("black")
 
-        # Update enemies
-        for enemy in enemies:
-            enemy.update(player, enemies, screen)
+    # Spawn and update XP orbs
+    xp_orbs.spawn(player)
+    xp_orbs.update(player)
 
-        # Update player
-        player.update(keys, dt, screen)
-        
-        # Display all with offset to player coordinates
-        offset_x = player.pos.x - SCREEN_WIDTH / 2
-        offset_y = player.pos.y - SCREEN_HEIGHT / 2
-        offset = pygame.Vector2(offset_x, offset_y)
-        
-        xp_orbs.draw_with_offset(screen, offset)
-        
-        for enemy in enemies:
-            enemy.draw_with_offset(screen, offset_x, offset_y)
-        player.draw_with_offset(screen, offset_x, offset_y)
+    # Spawn and update enemies
+    enemies.spawn(player)
+    enemies.update(player)
 
-        
-        pygame.display.flip()
-        break
-        
-    while paused:
-        font = pygame.font.Font(None, 36)
-        text = font.render("Paused", True, "white")
-        text_rect = text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 200))
-        screen.blit(text, text_rect)
-        pygame.display.flip()
-        break
+    # Handle player shooting
+    current_time = pygame.time.get_ticks() / 1000
+    if keys[pygame.K_SPACE]:  # Fire weapon
+        player.weapon.shoot(player, projectiles, current_time)
 
+    # Update projectiles
+    update_projectiles(dt)
+
+    # Update player
+    player.update(keys, dt, screen)
+
+    # Calculate camera offset
+    offset = pygame.Vector2(player.pos.x - SCREEN_WIDTH / 2, player.pos.y - SCREEN_HEIGHT / 2)
+
+    # Draw everything
+    draw_with_offset(offset)
+
+    pygame.display.flip()
 
 pygame.quit()
 sys.exit()
